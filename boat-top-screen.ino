@@ -1,31 +1,3 @@
- 
-
-
-/*********************************************************************
-This is an example for our Monochrome OLEDs based on SSD1306 drivers
-
-  Pick one up today in the adafruit shop!
-  ------> http://www.adafruit.com/category/63_98
-
-This example is for a 128x64 size display using I2C to communicate
-3 pins are required to interface (2 I2C and one reset)
-
-Adafruit invests time and resources providing this open source code, 
-please support Adafruit and open-source hardware by purchasing 
-products from Adafruit!
-
-Written by Limor Fried/Ladyada  for Adafruit Industries.  
-BSD license, check license.txt for more information
-All text above, and the splash screen must be included in any redistribution
-*********************************************************************/
-
-/*********************************************************************
-I change the adafruit SSD1306 to SH1106
-
-SH1106 driver don't provide several functions such as scroll commands.
-
-*********************************************************************/
-
 #include <SPI.h>
 #include <Wire.h>
 #include <Adafruit_GFX.h>
@@ -42,22 +14,111 @@ SH1106 driver don't provide several functions such as scroll commands.
 #include "MuxDisplay.h"
 #include "MultiInfoScreen.h"
 
-#define RX_PIN 19 // software serial port's reception pin
-#define TX_PIN 18 // software serial port's transmision pin
-#define SOFT_UART_BIT_RATE 9600 // 57600 38400 1200 19200 9600 115200 300
-#define RX_BUF_LENGTH 256 // software serial port's reception buffer length
-#define TX_BUF_LENGTH 256 // software serial port's transmision buffer length
-
 #if (SH1106_LCDHEIGHT != 64)
 #error("Height incorrect, please fix Adafruit_SH1106.h!");
 #endif
 
-RTCDue rtc(XTAL);
+RTCDue rtc(RC);
 MuxDisplay muxdis(displayConfigs);
 TinyGPSPlus gps;
 
-MultiInfoScreen screens(muxdis, rtc);
+MultiInfoScreen screens(&muxdis, &rtc);
 
+void setup()   {
+  pinMode(SustainEnablePin, OUTPUT);
+  digitalWrite(SustainEnablePin, HIGH);
+  
+  pinMode(LedPin, OUTPUT);
+  digitalWrite(LedPin, LOW);
+    
+  //inicjalizacje                
+  Serial.begin(9600);
+  Serial.println("Power up");
+
+  Serial1.begin(9600);
+
+  Wire.begin();
+  Wire.beginTransmission(0x68);
+  Wire.write(0x6B);
+  Wire.write(0);
+  Wire.endTransmission(true);
+
+  Can0.begin(CAN_BPS_250K);
+  Can0.watchFor();
+  
+  pinMode(ButtonPin, INPUT_PULLUP);
+  pinMode(PowerButtonPin, INPUT_PULLUP);
+  pinMode(DisplayResetPin, OUTPUT);
+  pinMode(Supply9VenablePin, OUTPUT);
+
+  digitalWrite(Supply9VenablePin, LOW);
+  delay(10);
+  digitalWrite(DisplayResetPin, LOW);
+  delay(100);
+  digitalWrite(DisplayResetPin, HIGH);
+
+  Serial.println("Init 1");
+  rtc.begin();
+  Serial.println("Init 2");
+  muxdis.init();
+  Serial.println("Init 3");
+  
+  screens.init();
+  Serial.println("Init 4");
+
+  Scheduler.startLoop(loop_com);
+  Serial.println("Init 5");
+}
+
+
+void loop() {
+  CAN_FRAME incoming;
+  
+  if(digitalRead(PowerButtonPin) == LOW){
+    digitalWrite(LedPin, HIGH);
+  }
+  else{
+    digitalWrite(LedPin, LOW);
+  }
+  
+  if(digitalRead(ButtonPin) == LOW){
+    digitalWrite(SustainEnablePin, LOW);
+  }
+
+   if (Can0.available() > 0) {
+      Can0.read(incoming);
+      //muxdis.select(1);
+      //drawDisp( incoming.data.bytes[0], muxdis.current() );
+   }
+   
+  static const unsigned long REFRESH_INTERVAL = 1000; // ms
+  static unsigned long lastRefreshTime = 0;
+  
+  if(millis() - lastRefreshTime >= REFRESH_INTERVAL)
+  {
+    Serial.println("Screen tick");
+    lastRefreshTime = millis();
+    screens.tick(); 
+  }
+  delay(10);   
+   //MPUTest();
+}
+
+void loop_com() {
+  Serial.println("GPS tick");
+  while (Serial1.available() > 0) {
+    char c = Serial1.read();
+    if (gps.encode(c)) {
+      //screens.setGPSTimeAndDate(gps.time, gps.date);
+      yield();
+    }
+   }
+  delay(300);
+}
+
+
+
+/*
 void setCursorForCenterText( Adafruit_SH1106 &display, const char*buf){
   int16_t x,y;
     uint16_t w,h;
@@ -118,46 +179,6 @@ void MPUTest() {
   //Serial.print(" | GyY = "); Serial.print(GyY);
   //Serial.print(" | GyZ = "); Serial.println(GyZ);
   delay(333);
-}
-
-void setup()   {
-  pinMode(SustainEnablePin, OUTPUT);
-  digitalWrite(SustainEnablePin, HIGH);
-  
-  pinMode(LedPin, OUTPUT);
-  digitalWrite(LedPin, LOW);
-    
-  //inicjalizacje                
-  Serial.begin(9600);
-  Serial.println("Power up");
-
-  Serial1.begin(9600);
-
-  Wire.begin();
-  Wire.beginTransmission(0x68);
-  Wire.write(0x6B);
-  Wire.write(0);
-  Wire.endTransmission(true);
-
-  Can0.begin(CAN_BPS_250K);
-  Can0.watchFor();
-  
-  pinMode(ButtonPin, INPUT_PULLUP);
-  pinMode(PowerButtonPin, INPUT_PULLUP);
-  pinMode(DisplayResetPin, OUTPUT);
-  pinMode(Supply9VenablePin, OUTPUT);
-
-  digitalWrite(Supply9VenablePin, LOW);
-  delay(10);
-  digitalWrite(DisplayResetPin, LOW);
-  delay(100);
-  digitalWrite(DisplayResetPin, HIGH);
-
-  rtc.begin();
-  muxdis.init();
-  screens.init();
-
-  Scheduler.startLoop(loop_com);
 }
 
 void displayInfo()
@@ -239,46 +260,5 @@ void displayInfo()
     }
   Serial.println();
 }
-
-void loop() {
-  CAN_FRAME incoming;
-  
-  if(digitalRead(PowerButtonPin) == LOW){
-    digitalWrite(LedPin, HIGH);
-  }
-  else{
-    digitalWrite(LedPin, LOW);
-  }
-  
-  if(digitalRead(ButtonPin) == LOW){
-    digitalWrite(SustainEnablePin, LOW);
-  }
-
-   if (Can0.available() > 0) {
-      Can0.read(incoming);
-      //muxdis.select(1);
-      //drawDisp( incoming.data.bytes[0], muxdis.current() );
-   }
-   
-  static const unsigned long REFRESH_INTERVAL = 1000; // ms
-  static unsigned long lastRefreshTime = 0;
-  
-  if(millis() - lastRefreshTime >= REFRESH_INTERVAL)
-  {
-    lastRefreshTime += REFRESH_INTERVAL;
-    screens.tick(); 
-  }
-   
-   //MPUTest();
-}
-
-void loop_com() {
-  while (Serial1.available() > 0) {
-    char c = Serial1.read();
-    if (gps.encode(c)) {
-      screens.setGPSTimeAndDate(gps.time, gps.date);
-    }
-   }
-  yield();
-}
+*/
 

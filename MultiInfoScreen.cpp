@@ -9,16 +9,25 @@
 
 
 
-MultiInfoScreen::MultiInfoScreen(MuxDisplay _muxdis, RTCDue _rtc) {
-  muxdis = &_muxdis;
-  rtc = & _rtc;
+MultiInfoScreen::MultiInfoScreen(MuxDisplay * _muxdis, RTCDue *_rtc) {
+  muxdis = _muxdis;
+  rtc = _rtc;
 }
 
-void MultiInfoScreen::init() {
+void MultiInfoScreen::init() {  
   uint8_t i = 0;
   while( configs[i].type > SCREEN_TYPE_NULL ) {
-    drawTitle(i);
-    display(i);
+    const ScreenConfig * conf = &configs[i];
+    muxdis->get(conf->disp_num)->setFont();
+    muxdis->get(conf->disp_num)->setTextSize(1);
+    muxdis->get(conf->disp_num)->setTextColor(WHITE);
+    drawTitle(conf);
+    i++;
+  }
+  
+  i = 0;
+  while( configs[i].type > SCREEN_TYPE_NULL ) {
+    display(configs[i++].disp_num);
   }
 }
 
@@ -27,19 +36,22 @@ void MultiInfoScreen::display(uint8_t screen) {
   muxdis->current()->display();
 }
 
-void MultiInfoScreen::drawTitle(uint8_t screen) {
-    const struct ScreenConfig * config = &configs[screen];
-    Adafruit_SH1106 * display = muxdis->get(config->disp_num);
+void MultiInfoScreen::drawTitle(const ScreenConfig * conf) {
+    Adafruit_SH1106 * disp = muxdis->get(conf->disp_num);
     int16_t x,y;
     uint16_t w,h;
-    display->getTextBounds(config->title,0,0,&x,&y,&w,&h);
-    int16_t setx = (display->width()-w)/2;
-    display->setCursor(setx,0);
-    display->print(config->title);
+    disp->getTextBounds((char*)conf->title,0,0,&x,&y,&w,&h);
+    int16_t setx = (disp->width()-w)/2;
+    disp->setCursor(setx,0);
+    disp->print(conf->title);
 }
 
 void MultiInfoScreen::tick() {
+  static boolean invertState = false;
   lastTick = millis();
+  muxdis->select(3);
+  muxdis->current()->invertDisplay(invertState);
+  invertState = !invertState;
 }
 
 void MultiInfoScreen::setGPSTimeAndDate(struct TinyGPSTime gpstime, struct TinyGPSDate gpsdate) {

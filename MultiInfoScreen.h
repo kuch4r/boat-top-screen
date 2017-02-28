@@ -13,12 +13,12 @@
 struct ScreenConfig {
   uint8_t type;
   uint8_t disp_num;
-  char * title;
+  const char * title;
 };
 
 class MultiInfoScreen {
   public:
-    MultiInfoScreen(MuxDisplay muxdis, RTCDue rtc);
+    MultiInfoScreen(MuxDisplay *muxdis, RTCDue *rtc);
 
     void init();
     void tick();
@@ -34,12 +34,14 @@ class MultiInfoScreen {
     void setBatteryData(uint8_t level);
 
     private:
-      void drawTitle(uint8_t screen);
+      void drawTitle(const ScreenConfig * conf);
       void display(uint8_t screen);
       
-      struct ScreenConfig configs[3] = {
+      const struct ScreenConfig configs[5] = {
         { SCREEN_TYPE_DATETIME, 1, "Clock" },
-        { SCREEN_TYPE_SPEED, 1, "Speed" },
+        { SCREEN_TYPE_SPEED, 2, "Speed" },
+        { SCREEN_TYPE_SPEED, 3, "Screen3" },
+        { SCREEN_TYPE_SPEED, 4, "Screen4" },
         { SCREEN_TYPE_NULL, 0, "" } // last row
       };
       RTCDue * rtc;
