@@ -24,6 +24,8 @@ TinyGPSPlus gps;
 
 MultiInfoScreen screens(&muxdis, &rtc);
 
+void can_callback_bms(CAN_FRAME *frame);
+
 void setup()   {
   pinMode(SustainEnablePin, OUTPUT);
   digitalWrite(SustainEnablePin, HIGH);
@@ -44,7 +46,9 @@ void setup()   {
   Wire.endTransmission(true);
 
   Can0.begin(CAN_BPS_250K);
-  Can0.watchFor();
+  //Can0.watchFor();
+  Can0.setRXFilter(1, 0x186, 0x186, false);
+  Can0.setCallback(1, can_callback_bms);
   
   pinMode(ButtonPin, INPUT_PULLUP);
   pinMode(PowerButtonPin, INPUT_PULLUP);
@@ -109,13 +113,20 @@ void loop_com() {
   while (Serial1.available() > 0) {
     char c = Serial1.read();
     if (gps.encode(c)) {
-      //screens.setGPSTimeAndDate(gps.time, gps.date);
+      screens.setGPSTimeAndDate(gps.time, gps.date);
+      screens.setGPSLocation(gps.location, gps.satellites);
+      screens.setGPSSpeed(gps.speed);
       yield();
     }
    }
   delay(300);
 }
 
+void can_callback_bms(CAN_FRAME *frame) {
+  if( frame->id == 0x186 ) {
+    screens.setEngineBattery(frame->data.bytes[7], frame->data.bytes[4]);
+  }
+}
 
 
 /*
