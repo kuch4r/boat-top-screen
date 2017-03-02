@@ -24,6 +24,7 @@ TinyGPSPlus gps;
 
 MultiInfoScreen screens(&muxdis, &rtc);
 
+void loop_gps();
 void can_callback_bms(CAN_FRAME *frame);
 
 void setup()   {
@@ -70,7 +71,7 @@ void setup()   {
   screens.init();
   Serial.println("Init 4");
 
-  Scheduler.startLoop(loop_com);
+  Scheduler.startLoop(loop_gps);
   Serial.println("Init 5");
 }
 
@@ -108,14 +109,12 @@ void loop() {
    //MPUTest();
 }
 
-void loop_com() {
+void loop_gps() {
   Serial.println("GPS tick");
   while (Serial1.available() > 0) {
     char c = Serial1.read();
     if (gps.encode(c)) {
-      screens.setGPSTimeAndDate(gps.time, gps.date);
-      screens.setGPSLocation(gps.location, gps.satellites);
-      screens.setGPSSpeed(gps.speed);
+      screens.setGPSData(&gps);
       yield();
     }
    }
@@ -124,7 +123,7 @@ void loop_com() {
 
 void can_callback_bms(CAN_FRAME *frame) {
   if( frame->id == 0x186 ) {
-    screens.setEngineBattery(frame->data.bytes[7], frame->data.bytes[4]);
+    screens.setEngineBatteryData(frame->data.bytes[7], frame->data.bytes[4]);
   }
 }
 

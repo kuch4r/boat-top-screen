@@ -19,19 +19,27 @@ struct ScreenConfig {
   const char * title;
 };
 
+typedef struct GPSData {
+  int32_t satelites;
+  double lat;
+  double lng;
+  double speed;
+  double course;
+  GPSData() { 
+    satelites = lat = lng = speed = course = 0; 
+  }
+} GPSData;
+
 class MultiInfoScreen {
   public:
-    MultiInfoScreen(MuxDisplay *muxdis, RTCDue *rtc);
+    MultiInfoScreen(MuxDisplay *muxdis, RTCDue *rtc) ;
 
     void init();
     void tick();
     
     /* GPS functions */
-    void setGPSTimeAndDate(struct TinyGPSTime gpstime, struct TinyGPSDate gpsdate);
-    void setGPSLocation(struct TinyGPSLocation gpslocation, struct TinyGPSInteger sats);
-    void setGPSSpeed(struct TinyGPSSpeed gpsspeed);
-
-    void setEngineBattery( uint8_t state, uint8_t soc);
+    void setGPSData( TinyGPSPlus * data);
+    void setEngineBatteryData( uint8_t state, uint8_t soc);
 
     /* Battery Data (from CAN) 
      * TODO: define values and resolution
@@ -39,22 +47,9 @@ class MultiInfoScreen {
     void setBatteryData(uint8_t level);
 
     private:
+      static const char * batteryStateToStr(uint8_t state);
+      
       uint8_t screen_by_type[10];
-          
-      void drawTitle(const ScreenConfig * conf);
-      void display(uint8_t screen);
-      void displayByType(uint8_t type);
-      Adafruit_SH1106 * getScreenByType(uint8_t type);
-
-      void drawGPSNoSignal();
-      void drawGPSLocation();
-      
-      void drawClock();
-      void drawLocation();
-      void drawBattery();
-
-      const char * batteryStateStr(uint8_t state);
-      
       const struct ScreenConfig configs[6] = {
         { SCREEN_TYPE_DATETIME, 1, "CLOCK" },
         { SCREEN_TYPE_POSITION, 2, "POSITION" },
@@ -65,16 +60,30 @@ class MultiInfoScreen {
       };
       RTCDue * rtc;
       MuxDisplay * muxdis;
+      
       uint32_t lastTick;
       uint32_t lastRtcSync;
 
-      double lat,lng;
-      uint32_t gps_sats;
+      GPSData gpsdata;
 
       boolean battery_refresh;
       uint32_t battery_last_data;
       uint8_t battery_state;
       uint8_t battery_soc;
+
+      
+      void display(uint8_t screen);
+      void displayByType(uint8_t type);
+      void drawTitle(const ScreenConfig * conf);
+      
+      Adafruit_SH1106 * getScreenByType(uint8_t type);
+
+      void drawGPSNoSignal();
+      void drawGPSLocation();
+      
+      void drawClock();
+      void drawLocation();
+      void drawBattery();
 };
 
 
