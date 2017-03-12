@@ -26,6 +26,7 @@ MultiInfoScreen screens(&muxdis, &rtc);
 
 void loop_gps();
 void can_callback_bms(CAN_FRAME *frame);
+void can_callback_board(CAN_FRAME *frame);
 
 void setup()   {
   pinMode(SustainEnablePin, OUTPUT);
@@ -34,10 +35,11 @@ void setup()   {
   pinMode(LedPin, OUTPUT);
   digitalWrite(LedPin, LOW);
     
-  //inicjalizacje                
+  //Init                
   Serial.begin(9600);
   Serial.println("Power up");
 
+  // GPS serial
   Serial1.begin(9600);
 
   Wire.begin();
@@ -47,9 +49,13 @@ void setup()   {
   Wire.endTransmission(true);
 
   Can0.begin(CAN_BPS_250K);
-  //Can0.watchFor();
+
+  // CAN BMS
   Can0.setRXFilter(1, 0x186, 0x186, false);
   Can0.setCallback(1, can_callback_bms);
+  // CAN maszt i miecz
+  Can0.setRXFilter(2, 0x286, 0x286, false);
+  Can0.setCallback(2, can_callback_board);
   
   pinMode(ButtonPin, INPUT_PULLUP);
   pinMode(PowerButtonPin, INPUT_PULLUP);
@@ -62,51 +68,56 @@ void setup()   {
   delay(100);
   digitalWrite(DisplayResetPin, HIGH);
 
-  Serial.println("Init 1");
+  // start RTC clock
   rtc.begin();
-  Serial.println("Init 2");
-  muxdis.init();
-  Serial.println("Init 3");
-  
-  screens.init();
-  Serial.println("Init 4");
 
+  // init 1Wire displays behind multiplexer
+  muxdis.init();
+  // init screens class (draws)
+  screens.init();
+
+  // start gps loop
   Scheduler.startLoop(loop_gps);
-  Serial.println("Init 5");
 }
 
 
 void loop() {
-  CAN_FRAME incoming;
-  
+  // handels powering off
+  static boolean PowerPinIsPressed = false;
   if(digitalRead(PowerButtonPin) == LOW){
-    digitalWrite(LedPin, HIGH);
-  }
-  else{
-    digitalWrite(LedPin, LOW);
-  }
-  
-  if(digitalRead(ButtonPin) == LOW){
-    digitalWrite(SustainEnablePin, LOW);
+    PowerPinIsPressed = true;
+  } else {
+    if( PowerPinIsPressed ) {
+      delay(10);
+      digitalWrite(LedPin, HIGH);
+      digitalWrite(SustainEnablePin, LOW);
+    }
   }
 
-   if (Can0.available() > 0) {
-      Can0.read(incoming);
-      //muxdis.select(1);
-      //drawDisp( incoming.data.bytes[0], muxdis.current() );
-   }
+  // handels switching to alternative state
+  static boolean ButtonPinIsPressed = false;
+  if(digitalRead(ButtonPin) == LOW){
+    if( !ButtonPinIsPressed ) {
+       if( screens.toggleAlternativeMode() ) {
+          digitalWrite(LedPin, HIGH);
+       } else {
+          digitalWrite(LedPin, LOW);
+       }
+    }
+    ButtonPinIsPressed = true;
+  } else {
+    ButtonPinIsPressed = false;
+  }
    
-  static const unsigned long REFRESH_INTERVAL = 1000; // ms
+  static const unsigned long REFRESH_INTERVAL = 500; // ms
   static unsigned long lastRefreshTime = 0;
   
-  if(millis() - lastRefreshTime >= REFRESH_INTERVAL)
-  {
-    Serial.println("Screen tick");
+  if(millis() - lastRefreshTime >= REFRESH_INTERVAL) {
     lastRefreshTime = millis();
+    screens.setMPUData( get_MPU_data() );
     screens.tick(); 
   }
   delay(10);   
-   //MPUTest();
 }
 
 void loop_gps() {
@@ -127,6 +138,46 @@ void can_callback_bms(CAN_FRAME *frame) {
   }
 }
 
+void can_callback_board(CAN_FRAME *frame) {
+  if( frame->id == 0x286 ) {
+    screens.setBoardData(frame->data.bytes[0]);
+  }
+}
+
+
+
+
+MPUData get_MPU_data() {
+  int16_t AcX,AcY,AcZ,Tmp,GyX,GyY,GyZ;
+  MPUData data;
+    
+  Wire.beginTransmission(0x68);
+  Wire.write(0x3B);  // starting with register 0x3B (ACCEL_XOUT_H)
+  Wire.endTransmission(false);
+  Wire.requestFrom(0x68,14,true);  // request a total of 14 registers
+  
+  AcX=Wire.read()<<8|Wire.read();  // 0x3B (ACCEL_XOUT_H) & 0x3C (ACCEL_XOUT_L)    
+  AcY=Wire.read()<<8|Wire.read();  // 0x3D (ACCEL_YOUT_H) & 0x3E (ACCEL_YOUT_L)
+  AcZ=Wire.read()<<8|Wire.read();  // 0x3F (ACCEL_ZOUT_H) & 0x40 (ACCEL_ZOUT_L)
+  Tmp=Wire.read()<<8|Wire.read();  // 0x41 (TEMP_OUT_H) & 0x42 (TEMP_OUT_L)
+  GyX=Wire.read()<<8|Wire.read();  // 0x43 (GYRO_XOUT_H) & 0x44 (GYRO_XOUT_L)
+  GyY=Wire.read()<<8|Wire.read();  // 0x45 (GYRO_YOUT_H) & 0x46 (GYRO_YOUT_L)
+  GyZ=Wire.read()<<8|Wire.read();  // 0x47 (GYRO_ZOUT_H) & 0x48 (GYRO_ZOUT_L)
+  
+  //Serial.print("AcX = "); Serial.print((int)AcX/182.05);
+  //Serial.print(" | AcY = "); Serial.print((int)AcY/182.05);
+  //Serial.print(" | AcZ = "); Serial.print((int)AcZ/182.05);
+  //Serial.print(" | Tmp = "); Serial.println(Tmp/340.00+36.53);  //equation for temperature in degrees C from datasheet
+  //Serial.print(" | GyX = "); Serial.print(GyX);
+  //Serial.print(" | GyY = "); Serial.print(GyY);
+  //Serial.print(" | GyZ = "); Serial.println(GyZ);
+
+  data.temp = Tmp/340.00+36.53;
+  data.AcX = (int)AcX/182.05;
+  data.AcY = (int)AcY/182.05;
+  data.AcZ = (int)AcZ/182.05;
+  return data;
+}
 
 /*
 void setCursorForCenterText( Adafruit_SH1106 &display, const char*buf){
@@ -167,29 +218,6 @@ void drawDisp( uint8_t num, Adafruit_SH1106 display ) {
   display.display();
 }
 
-void MPUTest() {
-  int16_t AcX,AcY,AcZ,Tmp,GyX,GyY,GyZ;
-  
-  Wire.beginTransmission(0x68);
-  Wire.write(0x3B);  // starting with register 0x3B (ACCEL_XOUT_H)
-  Wire.endTransmission(false);
-  Wire.requestFrom(0x68,14,true);  // request a total of 14 registers
-  AcX=Wire.read()<<8|Wire.read();  // 0x3B (ACCEL_XOUT_H) & 0x3C (ACCEL_XOUT_L)    
-  AcY=Wire.read()<<8|Wire.read();  // 0x3D (ACCEL_YOUT_H) & 0x3E (ACCEL_YOUT_L)
-  AcZ=Wire.read()<<8|Wire.read();  // 0x3F (ACCEL_ZOUT_H) & 0x40 (ACCEL_ZOUT_L)
-  Tmp=Wire.read()<<8|Wire.read();  // 0x41 (TEMP_OUT_H) & 0x42 (TEMP_OUT_L)
-  GyX=Wire.read()<<8|Wire.read();  // 0x43 (GYRO_XOUT_H) & 0x44 (GYRO_XOUT_L)
-  GyY=Wire.read()<<8|Wire.read();  // 0x45 (GYRO_YOUT_H) & 0x46 (GYRO_YOUT_L)
-  GyZ=Wire.read()<<8|Wire.read();  // 0x47 (GYRO_ZOUT_H) & 0x48 (GYRO_ZOUT_L)
-  Serial.print("AcX = "); Serial.print((int)AcX/182.05);
-  Serial.print(" | AcY = "); Serial.print((int)AcY/182.05);
-  Serial.print(" | AcZ = "); Serial.print((int)AcZ/182.05);
-  Serial.print(" | Tmp = "); Serial.println(Tmp/340.00+36.53);  //equation for temperature in degrees C from datasheet
-  //Serial.print(" | GyX = "); Serial.print(GyX);
-  //Serial.print(" | GyY = "); Serial.print(GyY);
-  //Serial.print(" | GyZ = "); Serial.println(GyZ);
-  delay(333);
-}
 
 void displayInfo()
 {

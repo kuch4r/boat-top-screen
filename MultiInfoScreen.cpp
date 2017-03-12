@@ -16,10 +16,18 @@
 MultiInfoScreen::MultiInfoScreen(MuxDisplay * _muxdis, RTCDue *_rtc) {
   muxdis = _muxdis;
   rtc = _rtc;
+  alternativeState = false;
+  countTick = 0;
   lastRtcSync = 0;
   battery_state = 0;
   battery_refresh = false;
   battery_last_data = 0;
+  board = 111;
+}
+
+boolean MultiInfoScreen::toggleAlternativeMode() {
+  alternativeState = !alternativeState;
+  return alternativeState;
 }
 
 void MultiInfoScreen::init() {  
@@ -67,15 +75,23 @@ void MultiInfoScreen::drawTitle(const ScreenConfig * conf) {
 }
 
 void MultiInfoScreen::tick() {
-  static boolean invertState = false;
   lastTick = millis();
-  muxdis->select(3);
-  muxdis->current()->invertDisplay(invertState);
-  invertState = !invertState;
+  if( countTick++ == 100 ) {
+    countTick = 0;
+  }
+  
+  //static boolean invertState = false;
+  //muxdis->select(3);
+  //muxdis->current()->invertDisplay(invertState);
+  //invertState = !invertState;
 
+  if( countTick % 2 ) { 
+    drawLocation();
+    drawBattery();
+    drawBoard();
+  }
   drawClock();
-  drawLocation();
-  drawBattery();
+  drawMPU();
 }
 
 void MultiInfoScreen::drawGPSNoSignal() {
@@ -111,13 +127,20 @@ void MultiInfoScreen::drawClock() {
     disp->setFont(&FreeSans12pt7b);
     disp->setTextSize(1);
     disp->setTextColor(WHITE);
-    sprintf(buf, "%02d:%02d:%02d", rtc->getHours(), rtc->getMinutes(), rtc->getSeconds());     
+    if( !alternativeState ) {
+      sprintf(buf, "%02d:%02d:%02d", rtc->getHours(), rtc->getMinutes(), rtc->getSeconds());     
+    } else {
+      sprintf(buf,"%02d-%02d-%d", rtc->getDay(), rtc->getMonth(), rtc->getYear());
+    }
     disp->getTextBounds((char*)buf,0,0,&x,&y,&w,&h);
     int16_t setx = (disp->width()-w)/2;
     disp->setCursor(setx,40);
     disp->print(buf);
-
-    sprintf(buf,"%02d-%02d-%d", rtc->getDay(), rtc->getMonth(), rtc->getYear());
+    if( !alternativeState ) {
+      sprintf(buf,"%02d-%02d-%d", rtc->getDay(), rtc->getMonth(), rtc->getYear());
+    } else {
+      sprintf(buf, "%02d:%02d:%02d", rtc->getHours(), rtc->getMinutes(), rtc->getSeconds());
+    }
     disp->setFont();
     disp->getTextBounds((char*)buf,0,0,&x,&y,&w,&h);
     setx = (disp->width()-w)/2;
@@ -138,7 +161,7 @@ void MultiInfoScreen::drawGPSLocation() {
     int16_t setx = (disp->width()-w)/2;
     disp->setCursor(setx,0);
     disp->print(buf);
-    
+        
     disp->setFont(&FreeSans9pt7b);
     disp->setTextSize(1);
     disp->setTextColor(WHITE);
@@ -150,6 +173,37 @@ void MultiInfoScreen::drawGPSLocation() {
     disp->print(buf);
     displayByType(SCREEN_TYPE_POSITION);
 }
+
+void MultiInfoScreen::drawMPU() {
+    char buf[20];
+    int16_t x,y;
+    uint16_t w,h;
+    Adafruit_SH1106 * disp = getScreenByType(SCREEN_TYPE_MPU);
+    disp->fillRect(0,10,128,64,BLACK);
+    
+    disp->setFont(&FreeSans18pt7b);
+    disp->setTextSize(1);
+    disp->setTextColor(WHITE);
+    sprintf(buf,"%.1f", mpudata.AcY);
+    disp->getTextBounds((char*)buf,0,0,&x,&y,&w,&h);
+    int16_t setx = (disp->width()-w)/2;
+    disp->setCursor(setx,44);
+    disp->print(buf);
+    //disp->setCursor(7,52);
+    //sprintf(buf,"%d", mpudata.AcX);
+    //disp->print(buf);
+
+    sprintf(buf,"Temp %.0f AcX %.1f", mpudata.temp, mpudata.AcX);
+    disp->setFont();
+    disp->getTextBounds((char*)buf,0,0,&x,&y,&w,&h);
+    setx = (disp->width()-w)/2;
+    disp->setCursor(setx,56);
+    disp->print(buf);
+    
+    displayByType(SCREEN_TYPE_MPU);
+}
+
+
 
 void MultiInfoScreen::drawBattery() {
     char buf[20];
@@ -173,7 +227,7 @@ void MultiInfoScreen::drawBattery() {
     if( millis() - battery_last_data < 1000*20 ) {
       sprintf(buf,"%s", batteryStateToStr(battery_state) );
     } else {
-      sprintf(buf,"<%s>", batteryStateToStr(battery_state) );
+      sprintf(buf,"<no signal>");
     }
     disp->getTextBounds((char*)buf,0,0,&x,&y,&w,&h);
     setx = (disp->width()-w)/2;
@@ -191,6 +245,39 @@ void MultiInfoScreen::drawLocation() {
     drawGPSLocation();
   }
 }
+
+void MultiInfoScreen::drawBoard() {
+  Adafruit_SH1106 * disp = getScreenByType(SCREEN_TYPE_BOARD);
+  disp->fillRect(0,10,64,118,BLACK);
+  disp->setTextSize(1);
+  disp->setTextColor(WHITE);
+  disp->setFont(&FreeSans9pt7b);
+  if( board == 111 ) {
+    disp->setFont(&FreeSans9pt7b);  
+    disp->setCursor(20,55);
+    disp->print("no");
+    disp->setCursor(5,70);
+    disp->print("signal");
+  } else {
+    int16_t x,y;
+    uint16_t w,h;
+    char buf[10];
+    sprintf(buf,"%d%%", board);
+    disp->getTextBounds((char*)buf,0,0,&x,&y,&w,&h);
+    int16_t setx = (disp->width()-w)/2;
+    disp->setCursor(setx,44);
+    disp->print(buf);
+    if( board >= 100 ) {
+      h = 0;
+    } else {
+      h = (uint16_t)((100-board)*1.18); 
+    }
+    disp->fillRect(0,10+h,64,118-h, INVERSE);
+  }
+  displayByType(SCREEN_TYPE_BOARD);
+}
+
+
 /*
  * Sets GPS values 
  */
@@ -243,6 +330,10 @@ void MultiInfoScreen::setGPSData(TinyGPSPlus * gps) {
   }
 }
 
+void MultiInfoScreen::setMPUData( MPUData data ) {
+  mpudata = data;
+}
+
 void MultiInfoScreen::setEngineBatteryData( uint8_t state, uint8_t soc) {
   if( battery_state != state || battery_soc != soc ) {
     battery_state = state;
@@ -250,6 +341,14 @@ void MultiInfoScreen::setEngineBatteryData( uint8_t state, uint8_t soc) {
     battery_refresh = true; 
   }
   battery_last_data = millis();
+}
+
+void MultiInfoScreen::setEngineData( uint8_t power ) {
+  
+}
+
+void MultiInfoScreen::setBoardData( uint8_t state ) {
+  board = state;
 }
 
 /*
