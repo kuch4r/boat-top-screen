@@ -203,6 +203,34 @@ void MultiInfoScreen::drawMPU() {
     displayByType(SCREEN_TYPE_MPU);
 }
 
+void MultiInfoScreen::drawEngine() {
+    char buf[20];
+    int16_t x,y;
+    uint16_t w,h;
+    Adafruit_SH1106 * disp = getScreenByType(SCREEN_TYPE_ENGINE);
+    disp->fillRect(0,10,128,64,BLACK);
+    
+    disp->setFont(&FreeSans18pt7b);
+    disp->setTextSize(1);
+    disp->setTextColor(WHITE);
+    sprintf(buf,"%.1f", enginedata.torque);
+    disp->getTextBounds((char*)buf,0,0,&x,&y,&w,&h);
+    int16_t setx = (disp->width()-w)/2;
+    disp->setCursor(setx,44);
+    disp->print(buf);
+    //disp->setCursor(7,52);
+    //sprintf(buf,"%d", mpudata.AcX);
+    //disp->print(buf);
+
+    sprintf(buf,"Vel %d Status %d", enginedata.velocity, enginedata.status);
+    disp->setFont();
+    disp->getTextBounds((char*)buf,0,0,&x,&y,&w,&h);
+    setx = (disp->width()-w)/2;
+    disp->setCursor(setx,56);
+    disp->print(buf);
+    
+    displayByType(SCREEN_TYPE_ENGINE);
+}
 
 
 void MultiInfoScreen::drawBattery() {
@@ -343,8 +371,10 @@ void MultiInfoScreen::setEngineBatteryData( uint8_t state, uint8_t soc) {
   battery_last_data = millis();
 }
 
-void MultiInfoScreen::setEngineData( uint8_t power ) {
-  
+void MultiInfoScreen::setInverterData( uint32_t velocity, uint16_t torque, uint16_t status ) {
+    enginedata.velocity = velocity;  
+    enginedata.torque = torque;
+    enginedata.status = status;
 }
 
 void MultiInfoScreen::setBoardData( uint8_t state ) {

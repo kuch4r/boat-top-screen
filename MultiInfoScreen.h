@@ -14,6 +14,7 @@
 #define SCREEN_TYPE_TEMP 5
 #define SCREEN_TYPE_BOARD 6
 #define SCREEN_TYPE_MPU 7
+#define SCREEN_TYPE_ENGINE 7
 
 struct ScreenConfig {
   uint8_t type;
@@ -39,6 +40,13 @@ typedef struct MPUData {
   double AcZ;
 } MPUData;
 
+typedef struct EngineData {
+  uint32_t velocity;
+  uint16_t torque;
+  uint16_t status;
+} EngineData;
+
+
 class MultiInfoScreen {
   public:
     MultiInfoScreen(MuxDisplay *muxdis, RTCDue *rtc) ;
@@ -54,7 +62,7 @@ class MultiInfoScreen {
     void setMPUData( MPUData data );
   
     void setEngineBatteryData( uint8_t state, uint8_t soc);
-    void setEngineData( uint8_t power );
+    void setInverterData( uint32_t velocity, uint16_t torque, uint16_t status );
     void setBoardData( uint8_t state);
 
     /* Battery Data (from CAN) 
@@ -66,7 +74,7 @@ class MultiInfoScreen {
       static const char * batteryStateToStr(uint8_t state);
       
       uint8_t screen_by_type[10];
-      const struct ScreenConfig configs[8] = {
+      const struct ScreenConfig configs[9] = {
         { SCREEN_TYPE_DATETIME, 1, "CLOCK" },
         { SCREEN_TYPE_POSITION, 2, "POSITION" },
         { SCREEN_TYPE_SPEED, 3, "SPEED" },
@@ -74,6 +82,7 @@ class MultiInfoScreen {
         { SCREEN_TYPE_TEMP, 5, "TEMPERATURES" },
         { SCREEN_TYPE_BOARD, 0, "BOARD" },
         { SCREEN_TYPE_MPU, 6, "MPU" },
+        { SCREEN_TYPE_ENGINE, 7, "ENGINE" },
         { SCREEN_TYPE_NULL, 0, "" } // last row
       };
       RTCDue * rtc;
@@ -87,6 +96,7 @@ class MultiInfoScreen {
 
       GPSData gpsdata;
       MPUData mpudata;
+      EngineData enginedata;
 
       boolean battery_refresh;
       uint32_t battery_last_data;
@@ -109,6 +119,8 @@ class MultiInfoScreen {
       void drawBattery();
 
       void drawBoard();
+
+      void drawEngine();
 
       void drawMPU();
 };

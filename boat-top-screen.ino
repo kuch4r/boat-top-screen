@@ -27,7 +27,7 @@ MultiInfoScreen screens(&muxdis, &rtc);
 void loop_gps();
 void can_callback_bms(CAN_FRAME *frame);
 void can_callback_board(CAN_FRAME *frame);
-
+void can_callback_inverter(CAN_FRAME * frame);
 void setup()   {
   pinMode(SustainEnablePin, OUTPUT);
   digitalWrite(SustainEnablePin, HIGH);
@@ -56,6 +56,9 @@ void setup()   {
   // CAN maszt i miecz
   Can0.setRXFilter(2, 0x286, 0x286, false);
   Can0.setCallback(2, can_callback_board);
+  // CAN inverter
+  Can0.setRXFilter(3, 0x383, 0x383, false);
+  Can0.setCallback(3, can_callback_inverter);
   
   pinMode(ButtonPin, INPUT_PULLUP);
   pinMode(PowerButtonPin, INPUT_PULLUP);
@@ -144,6 +147,11 @@ void can_callback_board(CAN_FRAME *frame) {
   }
 }
 
+void can_callback_inverter(CAN_FRAME *frame) {
+  if( frame->id == 0x383 ) {
+    screens.setInverterData(frame->data.low, frame->data.s2, frame->data.s3);
+  }
+}
 
 
 
