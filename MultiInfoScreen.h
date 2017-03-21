@@ -14,7 +14,7 @@
 #define SCREEN_TYPE_TEMP 5
 #define SCREEN_TYPE_BOARD 6
 #define SCREEN_TYPE_MPU 7
-#define SCREEN_TYPE_ENGINE 7
+#define SCREEN_TYPE_ENGINE 8
 
 struct ScreenConfig {
   uint8_t type;

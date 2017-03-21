@@ -213,7 +213,7 @@ void MultiInfoScreen::drawEngine() {
     disp->setFont(&FreeSans18pt7b);
     disp->setTextSize(1);
     disp->setTextColor(WHITE);
-    sprintf(buf,"%.1f", enginedata.torque);
+    sprintf(buf,"%d", enginedata.torque);
     disp->getTextBounds((char*)buf,0,0,&x,&y,&w,&h);
     int16_t setx = (disp->width()-w)/2;
     disp->setCursor(setx,44);
@@ -222,7 +222,7 @@ void MultiInfoScreen::drawEngine() {
     //sprintf(buf,"%d", mpudata.AcX);
     //disp->print(buf);
 
-    sprintf(buf,"Vel %d Status %d", enginedata.velocity, enginedata.status);
+    sprintf(buf,"Vel %ld Status %d", enginedata.velocity, enginedata.status);
     disp->setFont();
     disp->getTextBounds((char*)buf,0,0,&x,&y,&w,&h);
     setx = (disp->width()-w)/2;

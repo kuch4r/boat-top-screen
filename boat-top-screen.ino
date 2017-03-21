@@ -14,13 +14,20 @@
 #include "MuxDisplay.h"
 #include "MultiInfoScreen.h"
 
+#include <MPU6050.h>
+#include "KalmanFilter.h"
+
 #if (SH1106_LCDHEIGHT != 64)
 #error("Height incorrect, please fix Adafruit_SH1106.h!");
 #endif
 
+KalmanFilter kalmanX(0.001, 0.003, 0.03);
+KalmanFilter kalmanY(0.001, 0.003, 0.03);
+
 RTCDue rtc(RC);
 MuxDisplay muxdis(displayConfigs);
 TinyGPSPlus gps;
+MPU6050 mpu(0x68);
 
 MultiInfoScreen screens(&muxdis, &rtc);
 
@@ -43,11 +50,16 @@ void setup()   {
   Serial1.begin(9600);
 
   Wire.begin();
-  Wire.beginTransmission(0x68);
-  Wire.write(0x6B);
-  Wire.write(0);
-  Wire.endTransmission(true);
 
+  mpu.initialize();
+
+  mpu.setXAccelOffset(-461);
+  mpu.setYAccelOffset(1623);
+  mpu.setZAccelOffset(1455);
+  mpu.setXGyroOffset(1);
+  mpu.setXGyroOffset(39);
+  mpu.setXGyroOffset(55);
+ 
   Can0.begin(CAN_BPS_250K);
 
   // CAN BMS
@@ -78,7 +90,7 @@ void setup()   {
   muxdis.init();
   // init screens class (draws)
   screens.init();
-
+ 
   // start gps loop
   Scheduler.startLoop(loop_gps);
 }
@@ -114,13 +126,15 @@ void loop() {
    
   static const unsigned long REFRESH_INTERVAL = 500; // ms
   static unsigned long lastRefreshTime = 0;
+
+  screens.setMPUData( get_MPU_data() );
   
   if(millis() - lastRefreshTime >= REFRESH_INTERVAL) {
     lastRefreshTime = millis();
-    screens.setMPUData( get_MPU_data() );
     screens.tick(); 
   }
   delay(10);   
+  
 }
 
 void loop_gps() {
@@ -156,36 +170,55 @@ void can_callback_inverter(CAN_FRAME *frame) {
 
 
 MPUData get_MPU_data() {
-  int16_t AcX,AcY,AcZ,Tmp,GyX,GyY,GyZ;
   MPUData data;
-    
-  Wire.beginTransmission(0x68);
-  Wire.write(0x3B);  // starting with register 0x3B (ACCEL_XOUT_H)
-  Wire.endTransmission(false);
-  Wire.requestFrom(0x68,14,true);  // request a total of 14 registers
-  
-  AcX=Wire.read()<<8|Wire.read();  // 0x3B (ACCEL_XOUT_H) & 0x3C (ACCEL_XOUT_L)    
-  AcY=Wire.read()<<8|Wire.read();  // 0x3D (ACCEL_YOUT_H) & 0x3E (ACCEL_YOUT_L)
-  AcZ=Wire.read()<<8|Wire.read();  // 0x3F (ACCEL_ZOUT_H) & 0x40 (ACCEL_ZOUT_L)
-  Tmp=Wire.read()<<8|Wire.read();  // 0x41 (TEMP_OUT_H) & 0x42 (TEMP_OUT_L)
-  GyX=Wire.read()<<8|Wire.read();  // 0x43 (GYRO_XOUT_H) & 0x44 (GYRO_XOUT_L)
-  GyY=Wire.read()<<8|Wire.read();  // 0x45 (GYRO_YOUT_H) & 0x46 (GYRO_YOUT_L)
-  GyZ=Wire.read()<<8|Wire.read();  // 0x47 (GYRO_ZOUT_H) & 0x48 (GYRO_ZOUT_L)
-  
-  //Serial.print("AcX = "); Serial.print((int)AcX/182.05);
-  //Serial.print(" | AcY = "); Serial.print((int)AcY/182.05);
-  //Serial.print(" | AcZ = "); Serial.print((int)AcZ/182.05);
-  //Serial.print(" | Tmp = "); Serial.println(Tmp/340.00+36.53);  //equation for temperature in degrees C from datasheet
-  //Serial.print(" | GyX = "); Serial.print(GyX);
-  //Serial.print(" | GyY = "); Serial.print(GyY);
-  //Serial.print(" | GyZ = "); Serial.println(GyZ);
 
-  data.temp = Tmp/340.00+36.53;
-  data.AcX = (int)AcX/182.05;
-  data.AcY = (int)AcY/182.05;
-  data.AcZ = (int)AcZ/182.05;
+  int16_t ax, ay, az, gx, gy, gz;
+  mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
+  float nax = ax * .000061f * 9.80665f;
+  float nay = ay * .000061f * 9.80665f;
+  float deg  = (atan(nay/nax)*180.0)/M_PI;
+
+  // Kalman filter
+  float degkal = kalmanY.update(deg, gz * .000061f);
+  
+  data.temp = (mpu.getTemperature()/340.)+36.53;
+  data.AcX = (int)degkal;
+  data.AcY = (int)deg;
   return data;
 }
+
+//MPUData get_MPU_data() {
+//  int16_t AcX,AcY,AcZ,Tmp,GyX,GyY,GyZ;
+//  MPUData data;
+//    
+//  Wire.beginTransmission(0x68);
+//  Wire.write(0x3B);  // starting with register 0x3B (ACCEL_XOUT_H)
+//  Wire.endTransmission(false);
+//  Wire.requestFrom(0x68,14,true);  // request a total of 14 registers
+//  
+//  AcX=Wire.read()<<8|Wire.read();  // 0x3B (ACCEL_XOUT_H) & 0x3C (ACCEL_XOUT_L)    
+//  AcY=Wire.read()<<8|Wire.read();  // 0x3D (ACCEL_YOUT_H) & 0x3E (ACCEL_YOUT_L)
+//  AcZ=Wire.read()<<8|Wire.read();  // 0x3F (ACCEL_ZOUT_H) & 0x40 (ACCEL_ZOUT_L)
+//  Tmp=Wire.read()<<8|Wire.read();  // 0x41 (TEMP_OUT_H) & 0x42 (TEMP_OUT_L)
+//  GyX=Wire.read()<<8|Wire.read();  // 0x43 (GYRO_XOUT_H) & 0x44 (GYRO_XOUT_L)
+//  GyY=Wire.read()<<8|Wire.read();  // 0x45 (GYRO_YOUT_H) & 0x46 (GYRO_YOUT_L)
+//  GyZ=Wire.read()<<8|Wire.read();  // 0x47 (GYRO_ZOUT_H) & 0x48 (GYRO_ZOUT_L)
+//  
+//  //Serial.print("AcX = "); Serial.print((int)AcX/182.05);
+//  //Serial.print(" | AcY = "); Serial.print((int)AcY/182.05);
+//  //Serial.print(" | AcZ = "); Serial.print((int)AcZ/182.05);
+//  //Serial.print(" | Tmp = "); Serial.println(Tmp/340.00+36.53);  //equation for temperature in degrees C from datasheet
+//  //Serial.print(" | GyX = "); Serial.print(GyX);
+//  //Serial.print(" | GyY = "); Serial.print(GyY);
+//  //Serial.print(" | GyZ = "); Serial.println(GyZ);
+//
+//  data.temp = Tmp/340.00+36.53;
+//  data.AcX = (int)AcX/182.05;
+//  data.AcY = (int)AcY/182.05;
+//  data.AcZ = (int)AcZ/182.05;
+//  return data;
+//}
+
 
 /*
 void setCursorForCenterText( Adafruit_SH1106 &display, const char*buf){
