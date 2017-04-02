@@ -34,10 +34,7 @@ typedef struct GPSData {
 } GPSData;
 
 typedef struct MPUData {
-  double temp;
-  double AcX;
-  double AcY;
-  double AcZ;
+  double deg;
 } MPUData;
 
 typedef struct EngineData {
@@ -107,7 +104,13 @@ class MultiInfoScreen {
       
       void display(uint8_t screen);
       void displayByType(uint8_t type);
-      void drawTitle(const ScreenConfig * conf);
+      
+      void drawCenter(Adafruit_SH1106 * disp, uint8_t pos_y, const char * value, uint8_t font_size);
+      void drawValueCenter(Adafruit_SH1106 * disp, const char * value, uint8_t font_size);
+      void drawTwoValueCenter(Adafruit_SH1106 * disp, const char * line1, const char * line2, uint8_t font_size);
+      void drawFooterCenter(Adafruit_SH1106 * disp, const char * value);
+      void drawHeaderCenter(Adafruit_SH1106 * disp, const char * value);
+      
       
       Adafruit_SH1106 * getScreenByType(uint8_t type);
 

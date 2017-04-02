@@ -15,14 +15,10 @@
 #include "MultiInfoScreen.h"
 
 #include <MPU6050.h>
-#include "KalmanFilter.h"
 
 #if (SH1106_LCDHEIGHT != 64)
 #error("Height incorrect, please fix Adafruit_SH1106.h!");
 #endif
-
-KalmanFilter kalmanX(0.001, 0.003, 0.03);
-KalmanFilter kalmanY(0.001, 0.003, 0.03);
 
 RTCDue rtc(RC);
 MuxDisplay muxdis(displayConfigs);
@@ -35,6 +31,7 @@ void loop_gps();
 void can_callback_bms(CAN_FRAME *frame);
 void can_callback_board(CAN_FRAME *frame);
 void can_callback_inverter(CAN_FRAME * frame);
+
 void setup()   {
   pinMode(SustainEnablePin, OUTPUT);
   digitalWrite(SustainEnablePin, HIGH);
@@ -124,6 +121,7 @@ void loop() {
     ButtonPinIsPressed = false;
   }
    
+
   static const unsigned long REFRESH_INTERVAL = 500; // ms
   static unsigned long lastRefreshTime = 0;
 
@@ -134,7 +132,6 @@ void loop() {
     screens.tick(); 
   }
   delay(10);   
-  
 }
 
 void loop_gps() {
@@ -146,198 +143,71 @@ void loop_gps() {
       yield();
     }
    }
-  delay(300);
+  delay(500);
 }
 
+/*
+ * CAN callback
+ */
+
+/* BMS can callback */
 void can_callback_bms(CAN_FRAME *frame) {
   if( frame->id == 0x186 ) {
+    Serial.println("Can MSG 186");
     screens.setEngineBatteryData(frame->data.bytes[7], frame->data.bytes[4]);
   }
 }
 
+/* Winches controler (Board and mast) */
 void can_callback_board(CAN_FRAME *frame) {
   if( frame->id == 0x286 ) {
     screens.setBoardData(frame->data.bytes[0]);
   }
 }
 
+/* Eletric Engine Inverter */
 void can_callback_inverter(CAN_FRAME *frame) {
   if( frame->id == 0x383 ) {
     screens.setInverterData(frame->data.low, frame->data.s2, frame->data.s3);
   }
 }
 
+/*
+ * Gets data from MPU 
+ */
 
+#define MAX_MPU_READINGS 4
 
 MPUData get_MPU_data() {
   MPUData data;
-
+  static float readings[MAX_MPU_READINGS];
+  static uint8_t readings_ptr = 0;
+  static bool has_full_read = false;
+  
   int16_t ax, ay, az, gx, gy, gz;
+  
   mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
   float nax = ax * .000061f * 9.80665f;
   float nay = ay * .000061f * 9.80665f;
   float deg  = (atan(nay/nax)*180.0)/M_PI;
 
-  // Kalman filter
-  float degkal = kalmanY.update(deg, gz * .000061f);
-  
-  data.temp = (mpu.getTemperature()/340.)+36.53;
-  data.AcX = (int)degkal;
-  data.AcY = (int)deg;
+  readings[readings_ptr++] = deg;
+  if( readings_ptr >= MAX_MPU_READINGS ) {
+    readings_ptr = 0;
+    has_full_read = true;
+  }
+  if( has_full_read ) {
+    float result = 0;
+    for( uint8_t i = 0; i < MAX_MPU_READINGS; i++) {
+      result += readings[i];
+    }
+    data.deg = (int)(result/MAX_MPU_READINGS);
+  } else {
+    data.deg = 0;
+  }
   return data;
 }
 
-//MPUData get_MPU_data() {
-//  int16_t AcX,AcY,AcZ,Tmp,GyX,GyY,GyZ;
-//  MPUData data;
-//    
-//  Wire.beginTransmission(0x68);
-//  Wire.write(0x3B);  // starting with register 0x3B (ACCEL_XOUT_H)
-//  Wire.endTransmission(false);
-//  Wire.requestFrom(0x68,14,true);  // request a total of 14 registers
-//  
-//  AcX=Wire.read()<<8|Wire.read();  // 0x3B (ACCEL_XOUT_H) & 0x3C (ACCEL_XOUT_L)    
-//  AcY=Wire.read()<<8|Wire.read();  // 0x3D (ACCEL_YOUT_H) & 0x3E (ACCEL_YOUT_L)
-//  AcZ=Wire.read()<<8|Wire.read();  // 0x3F (ACCEL_ZOUT_H) & 0x40 (ACCEL_ZOUT_L)
-//  Tmp=Wire.read()<<8|Wire.read();  // 0x41 (TEMP_OUT_H) & 0x42 (TEMP_OUT_L)
-//  GyX=Wire.read()<<8|Wire.read();  // 0x43 (GYRO_XOUT_H) & 0x44 (GYRO_XOUT_L)
-//  GyY=Wire.read()<<8|Wire.read();  // 0x45 (GYRO_YOUT_H) & 0x46 (GYRO_YOUT_L)
-//  GyZ=Wire.read()<<8|Wire.read();  // 0x47 (GYRO_ZOUT_H) & 0x48 (GYRO_ZOUT_L)
-//  
-//  //Serial.print("AcX = "); Serial.print((int)AcX/182.05);
-//  //Serial.print(" | AcY = "); Serial.print((int)AcY/182.05);
-//  //Serial.print(" | AcZ = "); Serial.print((int)AcZ/182.05);
-//  //Serial.print(" | Tmp = "); Serial.println(Tmp/340.00+36.53);  //equation for temperature in degrees C from datasheet
-//  //Serial.print(" | GyX = "); Serial.print(GyX);
-//  //Serial.print(" | GyY = "); Serial.print(GyY);
-//  //Serial.print(" | GyZ = "); Serial.println(GyZ);
-//
-//  data.temp = Tmp/340.00+36.53;
-//  data.AcX = (int)AcX/182.05;
-//  data.AcY = (int)AcY/182.05;
-//  data.AcZ = (int)AcZ/182.05;
-//  return data;
-//}
 
 
-/*
-void setCursorForCenterText( Adafruit_SH1106 &display, const char*buf){
-  int16_t x,y;
-    uint16_t w,h;
-    display.getTextBounds((char*)buf,0,0,&x,&y,&w,&h);
-    display.setCursor((display.width()-w)/2,((display.height()-h)/2)+h);
-}
-
-void setCursorForTopText( Adafruit_SH1106 &display, const char*buf){
-    int16_t x,y;
-    uint16_t w,h;
-    display.getTextBounds((char*)buf,0,0,&x,&y,&w,&h);
-    int16_t setx = (display.width()-w)/2;
-    display.setCursor(setx,0);
-}
-
-void drawDisp( uint8_t num, Adafruit_SH1106 display ) {
-  char buf[3];
-  buf[0] = '0' + num;
-  buf[1] = '0' + num;
-  buf[2] = 0;
-  display.clearDisplay();
-  
-  
-  display.setFont();
-  display.setTextSize(1);
-  display.setTextColor(WHITE);
-  setCursorForTopText(display,"Time");
-  display.print("Time");
-  
-  display.setFont(&FreeSans24pt7b);
-  display.setTextSize(1);
-  display.setTextColor(WHITE);
-  setCursorForCenterText(display, buf);
-  display.print(buf);
-  
-  display.display();
-}
-
-
-void displayInfo()
-{
-  Serial.print(F("Location: ")); 
-  if (gps.location.isValid())
-  {
-    Serial.print(gps.location.lat(), 6);
-    Serial.print(F(","));
-    Serial.print(gps.location.lng(), 6);
-  }
-  else
-  {
-    Serial.print(F("INVALID"));
-  }
-
-  Serial.print(F("  Date/Time: "));
-  if (gps.date.isValid())
-  {
-    Serial.print(gps.date.month());
-    Serial.print(F("/"));
-    Serial.print(gps.date.day());
-    Serial.print(F("/"));
-    Serial.print(gps.date.year());
-  }
-  else
-  {
-    Serial.print(F("INVALID"));
-  }
-
-  Serial.print(F(" "));
-  if (gps.time.isValid())
-  {
-    if (gps.time.hour() < 10) Serial.print(F("0"));
-    Serial.print(gps.time.hour());
-    Serial.print(F(":"));
-    if (gps.time.minute() < 10) Serial.print(F("0"));
-    Serial.print(gps.time.minute());
-    Serial.print(F(":"));
-    if (gps.time.second() < 10) Serial.print(F("0"));
-    Serial.print(gps.time.second());
-    Serial.print(F("."));
-    if (gps.time.centisecond() < 10) Serial.print(F("0"));
-    Serial.print(gps.time.centisecond());
-  }
-  else
-  {
-    Serial.print(F("INVALID"));
-  }
-
-  
-  Serial.print( " SAT: ");
-    if( gps.satellites.isValid() ) {
-      Serial.print( gps.satellites.value() );
-    } else {
-      Serial.print("INVALID");
-    }
-  Serial.print( " LAT: ");
-    if( gps.altitude.isValid() ) {
-      Serial.print( gps.altitude.meters() );
-    } else {
-      Serial.print("INVALID");
-    }
-  Serial.println();
-
-  Serial.print( " SPEED: ");
-    if( gps.speed.isValid() ) {
-      Serial.print( gps.speed.kmph() );
-    } else {
-      Serial.print("INVALID");
-    }
-  Serial.println();
-
-  Serial.print( " COURS: ");
-    if( gps.course.isValid() ) {
-      Serial.print( gps.course.deg() );
-    } else {
-      Serial.print("INVALID");
-    }
-  Serial.println();
-}
-*/
 

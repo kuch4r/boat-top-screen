@@ -34,8 +34,7 @@ void MultiInfoScreen::init() {
   uint8_t i = 0;
   while( configs[i].type > SCREEN_TYPE_NULL ) {
     screen_by_type[configs[i].type] = configs[i].disp_num;
-    const ScreenConfig * conf = &configs[i];
-    drawTitle(conf);
+    this->drawHeaderCenter(this->getScreenByType(configs[i].type), configs[i].title);
     i++;
   }
   
@@ -61,17 +60,58 @@ Adafruit_SH1106 * MultiInfoScreen::getScreenByType(uint8_t type) {
   return muxdis->get(screen_by_type[type]);
 }
 
-void MultiInfoScreen::drawTitle(const ScreenConfig * conf) {
-    Adafruit_SH1106 * disp = muxdis->get(conf->disp_num);
-    int16_t x,y;
-    uint16_t w,h;
+void MultiInfoScreen::drawCenter(Adafruit_SH1106 * disp, uint8_t pos_y, const char * value, uint8_t font_size) {
+  int16_t x,y;
+  uint16_t w,h;
+
+  // select font
+  if( font_size == 9 ) {
+    disp->setFont(&FreeSans9pt7b);
+  } else if( font_size == 12 ) {
+    disp->setFont(&FreeSans12pt7b);
+  } else if( font_size == 18 ) {
+    disp->setFont(&FreeSans18pt7b);
+  } else if( font_size == 24 ) {
+    disp->setFont(&FreeSans24pt7b);
+  } else {
     disp->setFont();
-    disp->setTextSize(1);
-    disp->setTextColor(WHITE);
-    disp->getTextBounds((char*)conf->title,0,0,&x,&y,&w,&h);
-    int16_t setx = (disp->width()-w)/2;
-    disp->setCursor(setx,0);
-    disp->print(conf->title);
+  }
+  
+  disp->setTextSize(1);
+  disp->setTextColor(WHITE);
+  disp->getTextBounds((char*)value,0,0,&x,&y,&w,&h);
+  int16_t setx = (disp->width()-w)/2;
+  disp->setCursor(setx,pos_y);
+  disp->print(value);
+}
+
+void MultiInfoScreen::drawValueCenter(Adafruit_SH1106 * disp, const char * value, uint8_t font_size) {
+  int8_t xdiff = 0;
+  disp->fillRect(0,8,128,56,BLACK);
+  if( font_size == 9 ) {
+     xdiff = -4;
+  } else if( font_size == 18 ) {
+     xdiff = 4;
+  } else if( font_size == 24 ) {
+     xdiff = 6;
+  }
+  this->drawCenter(disp, 40 + xdiff, value, font_size);
+}
+
+void MultiInfoScreen::drawTwoValueCenter(Adafruit_SH1106 * disp, const char * line1, const char * line2, uint8_t font_size) {
+  disp->fillRect(0,8,128,56,BLACK);
+  this->drawCenter(disp, 28, line1, font_size);
+  this->drawCenter(disp, 52, line2, font_size);
+}
+
+void MultiInfoScreen::drawFooterCenter(Adafruit_SH1106 * disp, const char * value) {
+  disp->fillRect(0,56,128,64,BLACK);
+  this->drawCenter(disp, 56, value, 0);
+}
+
+void MultiInfoScreen::drawHeaderCenter(Adafruit_SH1106 * disp, const char * value) {
+  disp->fillRect(0,0,128,8,BLACK);
+  this->drawCenter(disp, 0, value, 0);
 }
 
 void MultiInfoScreen::tick() {
@@ -95,139 +135,70 @@ void MultiInfoScreen::tick() {
 }
 
 void MultiInfoScreen::drawGPSNoSignal() {
-    const char * text = "warming GPS";
     char buf[30];
-    int16_t x,y;
-    uint16_t w,h;
     Adafruit_SH1106 * disp = getScreenByType(SCREEN_TYPE_POSITION);
-    disp->fillRect(0,10,128,54,BLACK);
-    disp->setFont(&FreeSans9pt7b);
-    disp->setTextSize(1);
-    disp->setTextColor(WHITE);    
-    disp->getTextBounds((char*)text,0,0,&x,&y,&w,&h);
-    int16_t setx = (disp->width()-w)/2;
-    disp->setCursor(setx,40);
-    disp->print(text);
-
+    
+    this->drawValueCenter(disp, "Wait for GPS", 9);
+    
     sprintf(buf,"Satellites %ld", gpsdata.satelites);
-    disp->setFont();
-    disp->getTextBounds((char*)buf,0,0,&x,&y,&w,&h);
-    setx = (disp->width()-w)/2;
-    disp->setCursor(setx,56);
-    disp->print(buf);
+    this->drawFooterCenter(disp, buf);
+    
     displayByType(SCREEN_TYPE_POSITION);
 }
 
 void MultiInfoScreen::drawClock() {
     char buf[20];
-    int16_t x,y;
-    uint16_t w,h;
     Adafruit_SH1106 * disp = getScreenByType(SCREEN_TYPE_DATETIME);
-    disp->fillRect(0,10,128,54,BLACK);
-    disp->setFont(&FreeSans12pt7b);
-    disp->setTextSize(1);
-    disp->setTextColor(WHITE);
+    
     if( !alternativeState ) {
       sprintf(buf, "%02d:%02d:%02d", rtc->getHours(), rtc->getMinutes(), rtc->getSeconds());     
     } else {
       sprintf(buf,"%02d-%02d-%d", rtc->getDay(), rtc->getMonth(), rtc->getYear());
     }
-    disp->getTextBounds((char*)buf,0,0,&x,&y,&w,&h);
-    int16_t setx = (disp->width()-w)/2;
-    disp->setCursor(setx,40);
-    disp->print(buf);
+    this->drawValueCenter(disp, buf, 12);
+
     if( !alternativeState ) {
       sprintf(buf,"%02d-%02d-%d", rtc->getDay(), rtc->getMonth(), rtc->getYear());
     } else {
       sprintf(buf, "%02d:%02d:%02d", rtc->getHours(), rtc->getMinutes(), rtc->getSeconds());
     }
-    disp->setFont();
-    disp->getTextBounds((char*)buf,0,0,&x,&y,&w,&h);
-    setx = (disp->width()-w)/2;
-    disp->setCursor(setx,56);
-    disp->print(buf);
+    this->drawFooterCenter(disp, buf);
+    
     displayByType(SCREEN_TYPE_DATETIME);
 }
 
 void MultiInfoScreen::drawGPSLocation() {
-    char buf[20];
-    int16_t x,y;
-    uint16_t w,h;
+    char buf[20], buf2[20];
     Adafruit_SH1106 * disp = getScreenByType(SCREEN_TYPE_POSITION);
-    disp->fillRect(0,0,128,64,BLACK);
+    
     sprintf(buf,"LOCATION (%ld)", gpsdata.satelites);
-    disp->setFont();
-    disp->getTextBounds((char*)buf,0,0,&x,&y,&w,&h);
-    int16_t setx = (disp->width()-w)/2;
-    disp->setCursor(setx,0);
-    disp->print(buf);
-        
-    disp->setFont(&FreeSans9pt7b);
-    disp->setTextSize(1);
-    disp->setTextColor(WHITE);
-    disp->setCursor(7,28);
+    this->drawHeaderCenter(disp, buf);
+    
     sprintf(buf,"%c %f", (gpsdata.lat<0)?'S':'N', gpsdata.lat);
-    disp->print(buf);
-    disp->setCursor(7,52);
-    sprintf(buf,"%c %f", (gpsdata.lng<0)?'W':'E', gpsdata.lng);
-    disp->print(buf);
+    sprintf(buf2,"%c %f", (gpsdata.lng<0)?'W':'E', gpsdata.lng);
+    this->drawTwoValueCenter(disp, buf, buf2, 12);
     displayByType(SCREEN_TYPE_POSITION);
 }
 
 void MultiInfoScreen::drawMPU() {
     char buf[20];
-    int16_t x,y;
-    uint16_t w,h;
     Adafruit_SH1106 * disp = getScreenByType(SCREEN_TYPE_MPU);
-    disp->fillRect(0,10,128,64,BLACK);
     
-    disp->setFont(&FreeSans18pt7b);
-    disp->setTextSize(1);
-    disp->setTextColor(WHITE);
-    sprintf(buf,"%.1f", mpudata.AcY);
-    disp->getTextBounds((char*)buf,0,0,&x,&y,&w,&h);
-    int16_t setx = (disp->width()-w)/2;
-    disp->setCursor(setx,44);
-    disp->print(buf);
-    //disp->setCursor(7,52);
-    //sprintf(buf,"%d", mpudata.AcX);
-    //disp->print(buf);
-
-    sprintf(buf,"Temp %.0f AcX %.1f", mpudata.temp, mpudata.AcX);
-    disp->setFont();
-    disp->getTextBounds((char*)buf,0,0,&x,&y,&w,&h);
-    setx = (disp->width()-w)/2;
-    disp->setCursor(setx,56);
-    disp->print(buf);
-    
+    sprintf(buf,"%.1f", abs(mpudata.deg));
+    this->drawValueCenter(disp, buf, 18);
+        
     displayByType(SCREEN_TYPE_MPU);
 }
 
 void MultiInfoScreen::drawEngine() {
     char buf[20];
-    int16_t x,y;
-    uint16_t w,h;
     Adafruit_SH1106 * disp = getScreenByType(SCREEN_TYPE_ENGINE);
-    disp->fillRect(0,10,128,64,BLACK);
     
-    disp->setFont(&FreeSans18pt7b);
-    disp->setTextSize(1);
-    disp->setTextColor(WHITE);
     sprintf(buf,"%d", enginedata.torque);
-    disp->getTextBounds((char*)buf,0,0,&x,&y,&w,&h);
-    int16_t setx = (disp->width()-w)/2;
-    disp->setCursor(setx,44);
-    disp->print(buf);
-    //disp->setCursor(7,52);
-    //sprintf(buf,"%d", mpudata.AcX);
-    //disp->print(buf);
-
+    this->drawValueCenter(disp, buf, 18);
+    
     sprintf(buf,"Vel %ld Status %d", enginedata.velocity, enginedata.status);
-    disp->setFont();
-    disp->getTextBounds((char*)buf,0,0,&x,&y,&w,&h);
-    setx = (disp->width()-w)/2;
-    disp->setCursor(setx,56);
-    disp->print(buf);
+    this->drawFooterCenter(disp, buf);
     
     displayByType(SCREEN_TYPE_ENGINE);
 }
@@ -235,34 +206,23 @@ void MultiInfoScreen::drawEngine() {
 
 void MultiInfoScreen::drawBattery() {
     char buf[20];
-    int16_t x,y;
-    uint16_t w,h;
+    Adafruit_SH1106 * disp = getScreenByType(SCREEN_TYPE_BATTERY);
+    
     if( battery_state == 0 ) {
        return;
     }
-    Adafruit_SH1106 * disp = getScreenByType(SCREEN_TYPE_BATTERY);
-    disp->fillRect(0,10,128,54,BLACK);
-    disp->setFont(&FreeSans18pt7b);
-    disp->setTextSize(1);
-    disp->setTextColor(WHITE);
+    
     sprintf(buf, "%d%%", battery_soc);
-    disp->getTextBounds((char*)buf,0,0,&x,&y,&w,&h);
-    int16_t setx = (disp->width()-w)/2;
-    disp->setCursor(setx,44);
-    disp->print(buf);
-
-    disp->setFont();
+    this->drawValueCenter(disp, buf, 18);
+    
     if( millis() - battery_last_data < 1000*20 ) {
       sprintf(buf,"%s", batteryStateToStr(battery_state) );
     } else {
       sprintf(buf,"<no signal>");
     }
-    disp->getTextBounds((char*)buf,0,0,&x,&y,&w,&h);
-    setx = (disp->width()-w)/2;
-    disp->setCursor(setx,56);
-    disp->print(buf);
+    this->drawFooterCenter(disp, buf);
+    
     displayByType(SCREEN_TYPE_BATTERY);
-   
     battery_refresh = false;
 }
 
@@ -277,30 +237,28 @@ void MultiInfoScreen::drawLocation() {
 void MultiInfoScreen::drawBoard() {
   Adafruit_SH1106 * disp = getScreenByType(SCREEN_TYPE_BOARD);
   disp->fillRect(0,10,64,118,BLACK);
-  disp->setTextSize(1);
-  disp->setTextColor(WHITE);
-  disp->setFont(&FreeSans9pt7b);
+  
   if( board == 111 ) {
-    disp->setFont(&FreeSans9pt7b);  
-    disp->setCursor(20,55);
-    disp->print("no");
-    disp->setCursor(5,70);
-    disp->print("signal");
+    this->drawCenter(disp, 55, "no",9);
+    this->drawCenter(disp, 75, "signal",9);
   } else {
-    int16_t x,y;
-    uint16_t w,h;
+    uint8_t h;
     char buf[10];
-    sprintf(buf,"%d%%", board);
-    disp->getTextBounds((char*)buf,0,0,&x,&y,&w,&h);
-    int16_t setx = (disp->width()-w)/2;
-    disp->setCursor(setx,44);
-    disp->print(buf);
+    if( board <= 0 ) {
+      sprintf(buf, "UP");
+    } else if ( board >= 100 ) {
+      sprintf(buf, "DOWN");
+    } else {
+      sprintf(buf,"%d%%", board);
+    }
+    this->drawCenter(disp, 45, buf,9);
     if( board >= 100 ) {
       h = 0;
     } else {
-      h = (uint16_t)((100-board)*1.18); 
+      h = (uint16_t)((100-board)*1.08); 
     }
-    disp->fillRect(0,10+h,64,118-h, INVERSE);
+
+    disp->fillRect(0,10,64,118-h, INVERSE);
   }
   displayByType(SCREEN_TYPE_BOARD);
 }
