@@ -116,6 +116,7 @@ class MultiInfoScreen {
 
       void drawGPSNoSignal();
       void drawGPSLocation();
+      void drawSpeed();
       
       void drawClock();
       void drawLocation();

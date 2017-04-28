@@ -37,6 +37,7 @@ void MultiInfoScreen::init() {
     this->drawHeaderCenter(this->getScreenByType(configs[i].type), configs[i].title);
     i++;
   }
+  lastRtcSync = 0;
   
   i = 0;
   while( configs[i].type > SCREEN_TYPE_NULL ) {
@@ -129,6 +130,7 @@ void MultiInfoScreen::tick() {
     drawLocation();
     drawBattery();
     drawBoard();
+    drawSpeed();
   }
   drawClock();
   drawMPU();
@@ -174,8 +176,8 @@ void MultiInfoScreen::drawGPSLocation() {
     sprintf(buf,"LOCATION (%ld)", gpsdata.satelites);
     this->drawHeaderCenter(disp, buf);
     
-    sprintf(buf,"%c %f", (gpsdata.lat<0)?'S':'N', gpsdata.lat);
-    sprintf(buf2,"%c %f", (gpsdata.lng<0)?'W':'E', gpsdata.lng);
+    sprintf(buf,"%c %.4f", (gpsdata.lat<0)?'S':'N', gpsdata.lat);
+    sprintf(buf2,"%c %.4f", (gpsdata.lng<0)?'W':'E', gpsdata.lng);
     this->drawTwoValueCenter(disp, buf, buf2, 12);
     displayByType(SCREEN_TYPE_POSITION);
 }
@@ -189,6 +191,17 @@ void MultiInfoScreen::drawMPU() {
         
     displayByType(SCREEN_TYPE_MPU);
 }
+
+void MultiInfoScreen::drawSpeed() {
+    char buf[20];
+    Adafruit_SH1106 * disp = getScreenByType(SCREEN_TYPE_SPEED);
+    
+    sprintf(buf,"%.1f", gpsdata.speed);
+    this->drawValueCenter(disp, buf, 18);
+    
+    displayByType(SCREEN_TYPE_SPEED);
+}
+
 
 void MultiInfoScreen::drawEngine() {
     char buf[20];
@@ -269,11 +282,12 @@ void MultiInfoScreen::drawBoard() {
  */
 void MultiInfoScreen::setGPSData(TinyGPSPlus * gps) {
   /* sync date and time data - every 10 minutes */
-  if( gps->time.isValid() && gps->date.isValid() && millis() - lastRtcSync > 1000*600) {    
+  if( gps->time.isValid() && gps->date.isValid() && (rtc->getYear() == 2007 || millis() - lastRtcSync > 1000*600)) {    
     /* to save time we do full sync only if hour is different */
-    if( rtc->getHours() !=  gps->time.hour() ){
+    if( rtc->getHours() !=  gps->time.hour() || rtc->getYear() == gps->date.year() ){
       rtc->setTime(gps->time.hour(), gps->time.minute(), gps->time.second());
       rtc->setDate(gps->date.day(), gps->date.month(), gps->date.year());
+      rtc->setClock(rtc->unixtime() + 7200);
     } else {
       /* if RTC has the same hour we fix minute and seconds if there is delay */
       if( rtc->getMinutes() !=  gps->time.minute() ){
@@ -303,7 +317,7 @@ void MultiInfoScreen::setGPSData(TinyGPSPlus * gps) {
 
   /* speed */
   if( gps->speed.isValid() ){
-    gpsdata.speed = gps->speed.knots();
+    gpsdata.speed = gps->speed.kmph();
   } else {
     gpsdata.speed = 0;
   }

@@ -57,7 +57,7 @@ void setup()   {
   mpu.setXGyroOffset(39);
   mpu.setXGyroOffset(55);
  
-  Can0.begin(CAN_BPS_250K);
+  Can0.begin(CAN_BPS_125K);
 
   // CAN BMS
   Can0.setRXFilter(1, 0x186, 0x186, false);
@@ -135,10 +135,11 @@ void loop() {
 }
 
 void loop_gps() {
-  Serial.println("GPS tick");
+  
   while (Serial1.available() > 0) {
     char c = Serial1.read();
     if (gps.encode(c)) {
+      Serial.println("GPS data");
       screens.setGPSData(&gps);
       yield();
     }

@@ -13,15 +13,15 @@ const uint8_t PowerButtonPin = 6;
 
 const uint8_t displayConfigs[MUXDISPLAY_MAX][3] = {
 /* multiplexer port, i2c addr (0-0x3c, 1-0x3d), rotation (0 - normal, 1- 90, 2 - 180, 3 - 270) */
-  {0, 1, 1},
-  {2, 1, 0},
-  {2, 0, 0},
-  {3, 1, 0},
-  {3, 0, 0},
-  {5, 1, 2},
-  {5, 0, 2},
-  {4, 1, 2},
-  {4, 0, 2}
+  {0, 1, 3},
+  {2, 1, 2},
+  {2, 0, 2},
+  {3, 1, 2},
+  {3, 0, 2},
+  {5, 1, 0},
+  {5, 0, 0},
+  {4, 1, 0},
+  {4, 0, 0}
 };
 
 
