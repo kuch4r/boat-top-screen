@@ -23,6 +23,7 @@ MultiInfoScreen::MultiInfoScreen(MuxDisplay * _muxdis, RTCDue *_rtc) {
   battery_refresh = false;
   battery_last_data = 0;
   board = 111;
+  main_bat_voltage = 0;
 }
 
 boolean MultiInfoScreen::toggleAlternativeMode() {
@@ -126,12 +127,15 @@ void MultiInfoScreen::tick() {
   //muxdis->current()->invertDisplay(invertState);
   //invertState = !invertState;
 
-  if( countTick % 2 ) { 
+  if( countTick % 4 ) { 
     drawLocation();
     drawBattery();
     drawBoard();
     drawSpeed();
+    drawMainBattery();
+    
   }
+  drawEngine();
   drawClock();
   drawMPU();
 }
@@ -186,10 +190,23 @@ void MultiInfoScreen::drawMPU() {
     char buf[20];
     Adafruit_SH1106 * disp = getScreenByType(SCREEN_TYPE_MPU);
     
-    sprintf(buf,"%.1f", abs(mpudata.deg));
+    sprintf(buf,"%u", abs(round(mpudata.deg)));
     this->drawValueCenter(disp, buf, 18);
         
     displayByType(SCREEN_TYPE_MPU);
+}
+
+void MultiInfoScreen::drawMainBattery() {
+    char buf[20];
+    Adafruit_SH1106 * disp = getScreenByType(SCREEN_TYPE_MAINBAT);
+
+    if( main_bat_voltage ) {
+        sprintf(buf,"%.1f", main_bat_voltage/10.0);
+        this->drawValueCenter(disp, buf, 18);
+    } else {
+        this->drawValueCenter(disp, "no signal", 9);
+    }
+    displayByType(SCREEN_TYPE_MAINBAT);
 }
 
 void MultiInfoScreen::drawSpeed() {
@@ -207,10 +224,10 @@ void MultiInfoScreen::drawEngine() {
     char buf[20];
     Adafruit_SH1106 * disp = getScreenByType(SCREEN_TYPE_ENGINE);
     
-    sprintf(buf,"%d", enginedata.torque);
+    sprintf(buf,"%d", enginedata.velocity);
     this->drawValueCenter(disp, buf, 18);
     
-    sprintf(buf,"Vel %ld Status %d", enginedata.velocity, enginedata.status);
+    sprintf(buf,"Torque %.1f%% S:%d", abs(enginedata.torque)/10.0, enginedata.status);
     this->drawFooterCenter(disp, buf);
     
     displayByType(SCREEN_TYPE_ENGINE);
@@ -222,6 +239,8 @@ void MultiInfoScreen::drawBattery() {
     Adafruit_SH1106 * disp = getScreenByType(SCREEN_TYPE_BATTERY);
     
     if( battery_state == 0 ) {
+       this->drawValueCenter(disp, "no signal", 9);
+       displayByType(SCREEN_TYPE_BATTERY);
        return;
     }
     
@@ -343,7 +362,7 @@ void MultiInfoScreen::setEngineBatteryData( uint8_t state, uint8_t soc) {
   battery_last_data = millis();
 }
 
-void MultiInfoScreen::setInverterData( uint32_t velocity, uint16_t torque, uint16_t status ) {
+void MultiInfoScreen::setInverterData( int32_t velocity, int16_t torque, uint16_t status ) {
     enginedata.velocity = velocity;  
     enginedata.torque = torque;
     enginedata.status = status;
@@ -351,6 +370,11 @@ void MultiInfoScreen::setInverterData( uint32_t velocity, uint16_t torque, uint1
 
 void MultiInfoScreen::setBoardData( uint8_t state ) {
   board = state;
+}
+
+
+void MultiInfoScreen::setSetMainBattery( uint8_t voltage ) {
+  main_bat_voltage = voltage;
 }
 
 /*

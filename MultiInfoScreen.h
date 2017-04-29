@@ -15,6 +15,7 @@
 #define SCREEN_TYPE_BOARD 6
 #define SCREEN_TYPE_MPU 7
 #define SCREEN_TYPE_ENGINE 8
+#define SCREEN_TYPE_MAINBAT 9
 
 struct ScreenConfig {
   uint8_t type;
@@ -38,8 +39,8 @@ typedef struct MPUData {
 } MPUData;
 
 typedef struct EngineData {
-  uint32_t velocity;
-  uint16_t torque;
+  int32_t velocity;
+  int16_t torque;
   uint16_t status;
 } EngineData;
 
@@ -59,8 +60,9 @@ class MultiInfoScreen {
     void setMPUData( MPUData data );
   
     void setEngineBatteryData( uint8_t state, uint8_t soc);
-    void setInverterData( uint32_t velocity, uint16_t torque, uint16_t status );
+    void setInverterData( int32_t velocity, int16_t torque, uint16_t status );
     void setBoardData( uint8_t state);
+    void setSetMainBattery( uint8_t voltage );
 
     /* Battery Data (from CAN) 
      * TODO: define values and resolution
@@ -71,15 +73,16 @@ class MultiInfoScreen {
       static const char * batteryStateToStr(uint8_t state);
       
       uint8_t screen_by_type[10];
-      const struct ScreenConfig configs[9] = {
+      const struct ScreenConfig configs[10] = {
         { SCREEN_TYPE_DATETIME, 1, "CLOCK" },
         { SCREEN_TYPE_POSITION, 2, "POSITION" },
         { SCREEN_TYPE_SPEED, 3, "SPEED" },
         { SCREEN_TYPE_BATTERY, 4, "BATTERY" },
         { SCREEN_TYPE_TEMP, 5, "TEMPERATURES" },
         { SCREEN_TYPE_BOARD, 0, "BOARD" },
-        { SCREEN_TYPE_MPU, 6, "MPU" },
+        { SCREEN_TYPE_MPU, 6, "ROLL" },
         { SCREEN_TYPE_ENGINE, 7, "ENGINE" },
+        { SCREEN_TYPE_MAINBAT, 8, "MAIN BATTERY" },
         { SCREEN_TYPE_NULL, 0, "" } // last row
       };
       RTCDue * rtc;
@@ -101,6 +104,7 @@ class MultiInfoScreen {
       uint8_t battery_soc;
       uint8_t board;
 
+      uint8_t main_bat_voltage;
       
       void display(uint8_t screen);
       void displayByType(uint8_t type);
@@ -121,6 +125,7 @@ class MultiInfoScreen {
       void drawClock();
       void drawLocation();
       void drawBattery();
+      void drawMainBattery();
 
       void drawBoard();
 

@@ -63,7 +63,7 @@ void setup()   {
   Can0.setRXFilter(1, 0x186, 0x186, false);
   Can0.setCallback(1, can_callback_bms);
   // CAN maszt i miecz
-  Can0.setRXFilter(2, 0x286, 0x286, false);
+  Can0.setRXFilter(2, 0x190, 0x190, false);
   Can0.setCallback(2, can_callback_board);
   // CAN inverter
   Can0.setRXFilter(3, 0x383, 0x383, false);
@@ -122,7 +122,7 @@ void loop() {
   }
    
 
-  static const unsigned long REFRESH_INTERVAL = 500; // ms
+  static const unsigned long REFRESH_INTERVAL = 250; // ms
   static unsigned long lastRefreshTime = 0;
 
   screens.setMPUData( get_MPU_data() );
@@ -161,15 +161,16 @@ void can_callback_bms(CAN_FRAME *frame) {
 
 /* Winches controler (Board and mast) */
 void can_callback_board(CAN_FRAME *frame) {
-  if( frame->id == 0x286 ) {
-    screens.setBoardData(frame->data.bytes[0]);
+  if( frame->id == 0x190 ) {
+    screens.setBoardData(frame->data.bytes[1]);
+    screens.setSetMainBattery(frame->data.bytes[2]);
   }
 }
 
 /* Eletric Engine Inverter */
 void can_callback_inverter(CAN_FRAME *frame) {
   if( frame->id == 0x383 ) {
-    screens.setInverterData(frame->data.low, frame->data.s2, frame->data.s3);
+    screens.setInverterData(frame->data.high, frame->data.s1, frame->data.s0);
   }
 }
 
