@@ -118,7 +118,7 @@ void MultiInfoScreen::drawHeaderCenter(Adafruit_SH1106 * disp, const char * valu
 
 void MultiInfoScreen::tick() {
   //lastTick = millis();
-  if( countTick++ == 4 ) {
+  if( countTick++ == 5 ) {
     countTick = 0;
   }
   
@@ -141,7 +141,10 @@ void MultiInfoScreen::tick() {
   }    
   else if(countTick == 4 ) {
     drawMainBattery();
-  }     
+  }
+  else if(countTick == 5 ) {
+    drawTemepratures();
+  }          
   drawEngine();
   drawClock();
   drawMPU();
@@ -201,6 +204,17 @@ void MultiInfoScreen::drawMPU() {
     this->drawValueCenter(disp, buf, 24);
         
     displayByType(SCREEN_TYPE_MPU);
+}
+
+void MultiInfoScreen::drawTemepratures() {
+    char buf[20], buf2[20];
+    Adafruit_SH1106 * disp = getScreenByType(SCREEN_TYPE_TEMP);
+    
+    sprintf(buf,"%.1f C", temperaturesdata.outsidetemp);
+    sprintf(buf2,"%.1f C", temperaturesdata.watertemp);
+    this->drawTwoValueCenter(disp, buf, buf2, 12);
+        
+    displayByType(SCREEN_TYPE_TEMP);
 }
 
 void MultiInfoScreen::drawMainBattery() {
@@ -358,6 +372,11 @@ void MultiInfoScreen::setGPSData(TinyGPSPlus * gps) {
 
 void MultiInfoScreen::setMPUData( MPUData data ) {
   mpudata = data;
+}
+
+void MultiInfoScreen::setTemperaturesData( float OutsideTemp, float WaterTemp) {
+    temperaturesdata.outsidetemp = OutsideTemp;
+    temperaturesdata.watertemp = WaterTemp;
 }
 
 void MultiInfoScreen::setEngineBatteryData( uint8_t state, uint8_t soc) {

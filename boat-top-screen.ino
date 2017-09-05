@@ -35,6 +35,7 @@ void loop_gps();
 void can_callback_bms(CAN_FRAME *frame);
 void can_callback_board(CAN_FRAME *frame);
 void can_callback_inverter(CAN_FRAME * frame);
+void can_callback_temperatures(CAN_FRAME * frame);
 
 boolean StartUpFlag = false;
 
@@ -72,11 +73,14 @@ void setup()   {
   Can0.setRXFilter(1, 0x186, 0x186, false);
   Can0.setCallback(1, can_callback_bms);
   // CAN maszt i miecz
-  Can0.setRXFilter(2, 0x190, 0x190, false);
-  Can0.setCallback(2, can_callback_board);
+  Can0.setRXFilter(4, 0x190, 0x190, false);
+  Can0.setCallback(4, can_callback_board);
   // CAN inverter
   Can0.setRXFilter(3, 0x383, 0x383, false);
   Can0.setCallback(3, can_callback_inverter);
+  // CAN temperatures module
+  Can0.setRXFilter(2, 0x191, 0x191, false);
+  Can0.setCallback(2, can_callback_temperatures);
   
   pinMode(ButtonPin, INPUT_PULLUP);
   pinMode(DisplayResetPin, OUTPUT);
@@ -165,7 +169,7 @@ void loop_gps() {
 }
 
 /*
- * CAN callback
+ * CAN callbacks
  */
 
 /* BMS can callback */
@@ -179,8 +183,16 @@ void can_callback_bms(CAN_FRAME *frame) {
 /* Winches controler (Board and mast) */
 void can_callback_board(CAN_FRAME *frame) {
   if( frame->id == 0x190 ) {
+    Serial.println("Can MSG 0x190");
     screens.setBoardData(frame->data.bytes[1]);
     screens.setSetMainBattery(frame->data.bytes[2]);
+  }
+}
+
+/* Temeperatures module */
+void can_callback_temperatures(CAN_FRAME *frame) {
+  if( frame->id == 0x191 ) {
+    screens.setTemperaturesData(((float)(frame->data.bytes[0] + (frame->data.bytes[1]<<8)))/16 , ((float)(frame->data.bytes[4] + (frame->data.bytes[5]<<8)))/16);
   }
 }
 

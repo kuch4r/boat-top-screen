@@ -38,6 +38,11 @@ typedef struct MPUData {
   double deg;
 } MPUData;
 
+typedef struct TemperaturesData {
+  float outsidetemp;
+  float watertemp;
+} TemperaturesData;
+
 typedef struct EngineData {
   int32_t velocity;
   int16_t torque;
@@ -63,6 +68,7 @@ class MultiInfoScreen {
     void setInverterData( int32_t velocity, int16_t torque, uint16_t status );
     void setBoardData( uint8_t state);
     void setSetMainBattery( uint8_t voltage );
+    void setTemperaturesData( float OutsideTemp, float WaterTemp);
 
     /* Battery Data (from CAN) 
      * TODO: define values and resolution
@@ -97,6 +103,7 @@ class MultiInfoScreen {
       GPSData gpsdata;
       MPUData mpudata;
       EngineData enginedata;
+      TemperaturesData temperaturesdata;
 
       boolean battery_refresh;
       uint32_t battery_last_data;
@@ -126,6 +133,8 @@ class MultiInfoScreen {
       void drawLocation();
       void drawBattery();
       void drawMainBattery();
+
+      void drawTemepratures();
 
       void drawBoard();
 
