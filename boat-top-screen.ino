@@ -1,3 +1,7 @@
+#include <MPU6050.h>
+
+#include <MPU6050.h>
+
 #include <SPI.h>
 #include <Wire.h>
 #include <Adafruit_GFX.h>
@@ -32,12 +36,17 @@ void can_callback_bms(CAN_FRAME *frame);
 void can_callback_board(CAN_FRAME *frame);
 void can_callback_inverter(CAN_FRAME * frame);
 
+boolean StartUpFlag = false;
+
 void setup()   {
+  //power sustian
   pinMode(SustainEnablePin, OUTPUT);
-  digitalWrite(SustainEnablePin, HIGH);
+  StartUpFlag = true;
+  POWER_SUSTAIN_ENABLE;
+  
   
   pinMode(LedPin, OUTPUT);
-  digitalWrite(LedPin, LOW);
+  LED_OFF;
     
   //Init                
   Serial.begin(9600);
@@ -70,15 +79,15 @@ void setup()   {
   Can0.setCallback(3, can_callback_inverter);
   
   pinMode(ButtonPin, INPUT_PULLUP);
-  pinMode(PowerButtonPin, INPUT_PULLUP);
   pinMode(DisplayResetPin, OUTPUT);
   pinMode(Supply9VenablePin, OUTPUT);
+  pinMode(PowerButtonPin, INPUT_PULLUP);
 
-  digitalWrite(Supply9VenablePin, LOW);
+  DISPLAY_9V_ENABLE;
   delay(10);
-  digitalWrite(DisplayResetPin, LOW);
+  DISPLAY_RESET_ON;
   delay(100);
-  digitalWrite(DisplayResetPin, HIGH);
+  DISPLAY_RESET_OFF;
 
   // start RTC clock
   rtc.begin();
@@ -96,13 +105,19 @@ void setup()   {
 void loop() {
   // handels powering off
   static boolean PowerPinIsPressed = false;
-  if(digitalRead(PowerButtonPin) == LOW){
+  if(digitalRead(PowerButtonPin) == HIGH){
+    StartUpFlag = false;
+  }
+  
+  if(digitalRead(PowerButtonPin) == LOW && StartUpFlag == false){
     PowerPinIsPressed = true;
+    DISPLAY_9V_DISABLE;//Display power off
+    DISPLAY_RESET_ON;
   } else {
     if( PowerPinIsPressed ) {
       delay(10);
-      digitalWrite(LedPin, HIGH);
-      digitalWrite(SustainEnablePin, LOW);
+      LED_ON;
+      POWER_SUSTAIN_DISABLE;
     }
   }
 
@@ -111,9 +126,11 @@ void loop() {
   if(digitalRead(ButtonPin) == LOW){
     if( !ButtonPinIsPressed ) {
        if( screens.toggleAlternativeMode() ) {
-          digitalWrite(LedPin, HIGH);
+          LED_ON;
+          Serial.println("LED_ON");
        } else {
-          digitalWrite(LedPin, LOW);
+          LED_OFF;
+          Serial.println("LED_OFF");
        }
     }
     ButtonPinIsPressed = true;
@@ -139,7 +156,7 @@ void loop_gps() {
   while (Serial1.available() > 0) {
     char c = Serial1.read();
     if (gps.encode(c)) {
-      Serial.println("GPS data");
+      //Serial.println("GPS data");
       screens.setGPSData(&gps);
       yield();
     }

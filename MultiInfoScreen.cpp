@@ -157,11 +157,11 @@ void MultiInfoScreen::drawClock() {
     Adafruit_SH1106 * disp = getScreenByType(SCREEN_TYPE_DATETIME);
     
     if( !alternativeState ) {
-      sprintf(buf, "%02d:%02d:%02d", rtc->getHours(), rtc->getMinutes(), rtc->getSeconds());     
+      sprintf(buf, "%02d:%02d", rtc->getHours(), rtc->getMinutes());     
     } else {
       sprintf(buf,"%02d-%02d-%d", rtc->getDay(), rtc->getMonth(), rtc->getYear());
     }
-    this->drawValueCenter(disp, buf, 12);
+    this->drawValueCenter(disp, buf, 18);
 
     if( !alternativeState ) {
       sprintf(buf,"%02d-%02d-%d", rtc->getDay(), rtc->getMonth(), rtc->getYear());
@@ -191,7 +191,7 @@ void MultiInfoScreen::drawMPU() {
     Adafruit_SH1106 * disp = getScreenByType(SCREEN_TYPE_MPU);
     
     sprintf(buf,"%u", abs(round(mpudata.deg)));
-    this->drawValueCenter(disp, buf, 18);
+    this->drawValueCenter(disp, buf, 24);
         
     displayByType(SCREEN_TYPE_MPU);
 }
@@ -202,9 +202,9 @@ void MultiInfoScreen::drawMainBattery() {
 
     if( main_bat_voltage ) {
         sprintf(buf,"%.1f", main_bat_voltage/10.0);
-        this->drawValueCenter(disp, buf, 18);
+        this->drawValueCenter(disp, buf, 24);
     } else {
-        this->drawValueCenter(disp, "no signal", 9);
+        this->drawValueCenter(disp, "no signal", 12);
     }
     displayByType(SCREEN_TYPE_MAINBAT);
 }
@@ -214,7 +214,7 @@ void MultiInfoScreen::drawSpeed() {
     Adafruit_SH1106 * disp = getScreenByType(SCREEN_TYPE_SPEED);
     
     sprintf(buf,"%.1f", gpsdata.speed);
-    this->drawValueCenter(disp, buf, 18);
+    this->drawValueCenter(disp, buf, 24);
     
     displayByType(SCREEN_TYPE_SPEED);
 }
@@ -225,7 +225,7 @@ void MultiInfoScreen::drawEngine() {
     Adafruit_SH1106 * disp = getScreenByType(SCREEN_TYPE_ENGINE);
     
     sprintf(buf,"%d", enginedata.velocity);
-    this->drawValueCenter(disp, buf, 18);
+    this->drawValueCenter(disp, buf, 24);
     
     sprintf(buf,"Torque %.1f%% S:%d", abs(enginedata.torque)/10.0, enginedata.status);
     this->drawFooterCenter(disp, buf);
@@ -283,7 +283,7 @@ void MultiInfoScreen::drawBoard() {
     } else {
       sprintf(buf,"%d%%", board);
     }
-    this->drawCenter(disp, 45, buf,9);
+    this->drawCenter(disp, 45, buf,12);
     if( board >= 100 ) {
       h = 0;
     } else {
