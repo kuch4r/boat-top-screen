@@ -117,8 +117,8 @@ void MultiInfoScreen::drawHeaderCenter(Adafruit_SH1106 * disp, const char * valu
 }
 
 void MultiInfoScreen::tick() {
-  lastTick = millis();
-  if( countTick++ == 100 ) {
+  //lastTick = millis();
+  if( countTick++ == 4 ) {
     countTick = 0;
   }
   
@@ -127,14 +127,21 @@ void MultiInfoScreen::tick() {
   //muxdis->current()->invertDisplay(invertState);
   //invertState = !invertState;
 
-  if( countTick % 4 ) { 
+  if( countTick == 0 ) {
     drawLocation();
-    drawBattery();
-    drawBoard();
-    drawSpeed();
-    drawMainBattery();
-    
   }
+  else if(countTick == 1 ) {
+    drawBattery();
+  }
+  else if(countTick == 2 ) {
+    drawBoard();
+  }  
+  else if(countTick == 3 ) {
+    drawSpeed();
+  }    
+  else if(countTick == 4 ) {
+    drawMainBattery();
+  }     
   drawEngine();
   drawClock();
   drawMPU();
